@@ -1,0 +1,5 @@
+blomstra-migrate-password:
+  admin:
+    setting:
+      importing-password-field: Field in users table containing old password to migrate
+      importing-password-field-hash: Hashing algorithm of the old password
