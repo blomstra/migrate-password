@@ -24,14 +24,14 @@ class Middleware implements MiddlewareInterface
         $algo = $this->settings->get('blomstra-migrate-password.importing-password-hash');
 
         // Skipping when the field or hashing algorithm has not been declared in settings/admin.
-        if (empty($field) || empty($hash)) {
+        if (empty($field)) {
             return $handler->handle($request);
         }
 
         $actor = RequestUtil::getActor($request);
 
         // We will only take action during log in, at no other step.
-        if (! $actor->isGuest()) {
+        if ($request->getMethod() !== 'POST' || ! $actor->isGuest()) {
             return $handler->handle($request);
         }
 
@@ -45,7 +45,7 @@ class Middleware implements MiddlewareInterface
 
         $user = $this->users->findByIdentification($params['identification']);
 
-        // Ignore requests where a log in attempt relates to no user or that user no longer has the old password field.
+        // Ignore requests where a login attempt relates to no user or that user no longer has the old password field.
         if (! $user || empty($user->{$field})) {
             return $handler->handle($request);
         }
@@ -66,10 +66,15 @@ class Middleware implements MiddlewareInterface
         return $handler->handle($request);
     }
 
-    private function checkPassUsingAlgo(string $password, string $hashed, string $algo): bool
+    private function checkPassUsingAlgo(string $password, string $hashed, string $algo = null): bool
     {
+        // Override chosen algo in case it is properly stored with newer php hashing functions.
+        if (preg_match('~^\$[^$]+\$~', $hashed)) {
+            return password_verify($password, $hashed);
+        }
+
         return match($algo) {
-            'argon2' => password_verify($password, PASSWORD_ARGON2ID),
+            'argon2' => password_verify($password, $hashed),
             'md5' => md5($password) === $hashed,
             default => throw new \InvalidArgumentException('Declare algorithm before use.')
         };
